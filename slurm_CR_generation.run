@@ -1,0 +1,57 @@
+#!/bin/bash
+#SBATCH --job-name=my_array_job
+#SBATCH --output=output_%A_%a.out
+#SBATCH --error=error_%A_%a.err
+#SBATCH --array=0-71  # Define the range of array indices
+#SBATCH --time=00:30:00  # 30 minutes per job
+#SBATCH --nodes=1
+#SBATCH --ntasks=1
+#SBATCH --cpus-per-task=1
+#SBATCH --mem=1G
+
+#SBATCH --mail-type=BEGIN,END,FAIL
+#SBATCH --mail-user=federica.sibilla@unil.ch
+
+# Load necessary modules (if any)
+module load gcc python
+
+# Activate the Python virtual environment
+source myenv/bin/activate
+
+# Define arrays of parameters
+n_resources_arr=(5 8 17 25)
+supplied_arr=(1 2 3)
+average_consumed_arr=(1 3 4)
+leakage_arr=(0.2 0.8)
+replica_arr=(1)
+
+# Get the index from SLURM_ARRAY_TASK_ID
+index=${SLURM_ARRAY_TASK_ID}
+
+# Calculate the number of combinations per parameter array
+n_resources_count=${#n_resources_arr[@]}
+supplied_count=${#supplied_arr[@]}
+average_consumed_count=${#average_consumed_arr[@]}
+leakage_count=${#leakage_arr[@]}
+replica_count=${#replica_arr[@]}
+
+# Determine the current combination parameters
+combination_index=$((index % (n_resources_count * supplied_count * average_consumed_count * leakage_count * replica_coun$
+n_resources_index=$((combination_index / (supplied_count * average_consumed_count * leakage_count * replica_count)))
+combination_index=$((combination_index % (supplied_count * average_consumed_count * leakage_count * replica_count)))
+supplied_index=$((combination_index / (average_consumed_count * leakage_count * replica_count)))
+combination_index=$((combination_index % (average_consumed_count * leakage_count * replica_count)))
+average_consumed_index=$((combination_index / (leakage_count * replica_count)))
+combination_index=$((combination_index % (leakage_count * replica_count)))
+leakage_index=$((combination_index / replica_count))
+replica_index=$((combination_index % replica_count))
+
+# Extract parameter values
+n_resources=${n_resources_arr[$n_resources_index]}
+supplied=${supplied_arr[$supplied_index]}
+average_consumed=${average_consumed_arr[$average_consumed_index]}
+leakage=${leakage_arr[$leakage_index]}
+replica=${replica_arr[$replica_index]}
+
+# Esegui lo script Python con i parametri scelti
+python /users/fsibilla/A12_CR_generate/CR_generation.py $n_resources $supplied $average_consumed $leakage $replica
