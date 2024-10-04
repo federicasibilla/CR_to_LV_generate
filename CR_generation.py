@@ -100,7 +100,7 @@ def LV_model(t,y,r0,A,n_s):
 # parameters to change: number of resources, number of supplied resources, number of resources consumed by each,
 # leakage, the seed for the replica number
 
-def CR_and_mapping(n_resources,supplied,average_consumed,leakage,replica):
+def CR_and_mapping(n_resources,supplied,average_consumed,leakage,replenishment,sparsity):
 
     """
     n_resources: int, number of total resources
@@ -108,23 +108,23 @@ def CR_and_mapping(n_resources,supplied,average_consumed,leakage,replica):
     average_consumed: int, number of resources that are consumed by each species
     leakage: float, leakage parameter
     replice: int, replica seed
+    sparsity: float, between 0 and 1 
 
     RETURNS: saves the results of each individual simulation in a different folder named as the 
 
     """
 
+    replica=np.random.seed()
+
     # create paths to save results
     path = os.path.splitext(os.path.abspath(__file__))[0]
     executable_name = os.path.basename(__file__).split('.')[0]
-    results_dir = f"{path}_results/{n_resources}_{supplied}_{average_consumed}_{leakage}_{replica}"
+    results_dir = f"{path}_results/{n_resources}_{supplied}_{average_consumed}_{leakage}_{replenishment}_{sparsity}_{replica}"
     os.makedirs(results_dir, exist_ok=True)
 
     n_resources = int(n_resources)
     supplied = int(supplied)
     average_consumed = int(average_consumed)
-    replica = int(replica)
-
-    replica=np.random.seed()
 
     # number of species and number of nutrients
 
@@ -146,7 +146,7 @@ def CR_and_mapping(n_resources,supplied,average_consumed,leakage,replica):
     spec_met = np.ones((n_s,n_r))
 
     # create metabolic matrix of sparcity 0.8 with non zero entries sampled from Dirichelet distribution
-    met_mat = definitions.met_dir(n_r,0.8)
+    met_mat = definitions.met_dir(n_r,sparsity)
 
     # recapitulate in dictionary
     mat = {
@@ -174,11 +174,11 @@ def CR_and_mapping(n_resources,supplied,average_consumed,leakage,replica):
     tau = np.zeros((n_r))+10
     ext = np.zeros((n_r))
     # primary carbon source replenished to saturation
-    ext[0] = 10
+    ext[0] = replenishment
     # sources to replenish 
-    ext[ext_indices] = 10
+    ext[ext_indices] = replenishment
     # initial guess for resources
-    guess = np.ones((n_r))*10
+    guess = np.ones((n_r))*replenishment
 
     # define parameters
     param = {
@@ -193,7 +193,7 @@ def CR_and_mapping(n_resources,supplied,average_consumed,leakage,replica):
     }
 
     # run CR model for 200000 steps 
-    N_fin,R_fin=well_mixed.run_wellmixed(np.ones((n_s))*0.1,param,mat,well_mixed.dR_dt_maslov,well_mixed.dN_dt_maslov,200000)
+    N_fin,R_fin=well_mixed.run_wellmixed(np.ones((n_s)),param,mat,well_mixed.dR_dt_maslov,well_mixed.dN_dt_maslov,200000)
 
     # calculate matrices for mapping
     grad_mat=grad_i_alpha(R_fin[-1,:],param,mat)
@@ -215,7 +215,7 @@ def CR_and_mapping(n_resources,supplied,average_consumed,leakage,replica):
     lv_args = (g_LV,A_int,n_s)
     t_span_lv = (0,10000)
     t_eval_lv = np.arange(t_span_lv[0],t_span_lv[1],0.1)
-    solLV = solve_ivp(fun=LV_model, t_span=t_span_lv, y0=np.ones((n_s))*0.1, t_eval=t_eval_lv, args=lv_args)
+    solLV = solve_ivp(fun=LV_model, t_span=t_span_lv, y0=np.ones((n_s)), t_eval=t_eval_lv, args=lv_args)
 
     # save in output file all parameters 
     with open(f"{results_dir}/parameters.txt", 'w') as file:
@@ -231,11 +231,13 @@ def CR_and_mapping(n_resources,supplied,average_consumed,leakage,replica):
             'supplied':supplied,
             'average_consumed':average_consumed,
             'leakage':leakage,
-            'replica':replica,
+            'replenishment':replenishment,
+            'replica_seed':replica,
+            'sparsity':sparsity,
             'uptake':up_mat,
             'D':met_mat,
-            'CR_R':R_fin,
-            'CR_N':N_fin,
+            'CR_R':R_fin[::10], # only save one every 10 time steps to make it lighter
+            'CR_N':N_fin[::10], # only save one every 10 time steps to make it lighter
             'LV': solLV.y,
             'g0':g_LV,
             'A':A_int
@@ -257,16 +259,17 @@ def CR_and_mapping(n_resources,supplied,average_consumed,leakage,replica):
 if __name__ == "__main__":
     
     # Check if there are command-line arguments
-    if len(sys.argv) == 6:
+    if len(sys.argv) == 7:
         n_resources = float(sys.argv[1])
         supplied = float(sys.argv[2])
         average_consumed = float(sys.argv[3])
         leakage = float(sys.argv[4])
-        replica = float(sys.argv[5])
+        replenishment= float(sys.argv[5])
+        sparsity = float(sys.argv[6])
 
         # Run the simulation with the provided parameters
-        CR_and_mapping(n_resources,supplied,average_consumed,leakage,replica)
-        print(f"Simulation completed for {n_resources} resources, {supplied} supplied, {average_consumed} consumed and leakage {leakage}, replica {replica}")
+        CR_and_mapping(n_resources,supplied,average_consumed,leakage,replenishment,sparsity)
+        print(f"Simulation completed for {n_resources} resources, {supplied} supplied, {average_consumed} consumed and leakage {leakage}, replenishment {replenishment}, sparsity {sparsity}")
 
     else:
         print("Usage: python CR_generation.py")
