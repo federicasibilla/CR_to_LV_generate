@@ -3,7 +3,7 @@
 #SBATCH --output=output_%A_%a.out
 #SBATCH --error=error_%A_%a.err
 #SBATCH --array=0-1295  # Define the range of array indices
-#SBATCH --time=00:30:00  # 30 minutes per job
+#SBATCH --time=01:00:00  # 30 minutes per job
 #SBATCH --nodes=1
 #SBATCH --ntasks=1
 #SBATCH --cpus-per-task=1
